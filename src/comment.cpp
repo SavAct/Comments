@@ -1,5 +1,48 @@
 #include <comment.hpp>
 
+ACTION comment::section(name creator, string& link){
+  require_auth(creator);
+
+  // Get rLink and scope value
+  string rLink;
+  uint64_t scopeValue = scopeToValue(getDomainScope(link, rLink));
+
+  // Get table by scope
+  section_table _section(get_self(), scopeValue);
+  auto itr = _section.find(scopeValue);
+  
+  // Create a new reference
+  Ref ref = {
+    // Note: .trxId Will be initiated to zero by itself
+    .bTime = eosio::current_block_time().to_time_point().time_since_epoch().count()
+  };
+
+  // create entry object
+  Entry newEntry = {
+    .rLink = rLink,
+    .like = 0,
+    .disl = 0,
+    .creator = creator,
+    .ref = ref
+  };
+
+  if(itr == _section.end()){
+    // Creare a new tbLine and add the entry
+    _section.emplace(creator, [&](auto& tbLine) {
+      tbLine.hash = getPrimaryKey(rLink);
+      tbLine.entries.push_back(newEntry);
+    });
+  } else {
+    auto entryItr = findEntry(itr, rLink);  // Find entry
+    check(entryItr != itr->entries.end(), "This link already exits.");
+
+    // Add entry to this tbLine
+    _section.modify(itr, creator, [&](auto& tbLine) {
+      tbLine.entries.push_back(newEntry);
+    });
+  }
+}
+
 ACTION comment::clearentry(string& link) {
 
   // Get rLink and strScope
@@ -141,7 +184,7 @@ uint64_t comment::getPrimaryKey(string& rLink){
   return primary;
 }
 
-std::list<comment::entry>::const_iterator comment::findEntry(comment::section_table::const_iterator itr, name creator){
+std::list<comment::Entry>::const_iterator comment::findEntry(comment::section_table::const_iterator itr, name creator){
 	auto entryItr = itr->entries.begin();
 	while (entryItr != itr->entries.end()) {
     if(entryItr->creator == creator){
@@ -152,7 +195,7 @@ std::list<comment::entry>::const_iterator comment::findEntry(comment::section_ta
 	return entryItr;
 }	
 
-std::list<comment::entry>::const_iterator comment::findEntry(comment::section_table::const_iterator itr, string& rLink){
+std::list<comment::Entry>::const_iterator comment::findEntry(comment::section_table::const_iterator itr, string& rLink){
 	auto entryItr = itr->entries.begin();
 	while (entryItr != itr->entries.end()) {
     if(std::equal(entryItr->rLink.begin(), entryItr->rLink.end(), std::begin(rLink))){

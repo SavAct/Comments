@@ -4,8 +4,12 @@ SavAct's comments section is a way out.
 ## Immutable comment section for all websites
 This smart contract allows comments to be linked to web pages. The comments are immutable stored on blockchain.
 
+## How it works
+Someone creats a comment section for a link. Comments are free, but likes and dislikes are measured in system token amounts. For offering the RAM the amount for likes goes to the creator. The dislikes are withdrown to all token owners. 
+As a website owner, you should know your URLs at first. Therefore, you can create the comment section as first, otherwise other peaple may do it and get the payments.
+
 ## Current Features
-- No need of further RAM for each new comment.
+- No need of further RAM for each new comment. Only the reference to the current last comment is stored on RAM. All comments are connected in a chain within the chain of the blockchain.
 - The first 12 characters of a domain are used as scope. 
 - Conversion of all allowed characters in ACE strings to base 40 numbers to wrap them in one uint64_t type.
 - The beginning characters "https://", "http://", "www." and "m." of links are not distinguished.
@@ -15,7 +19,8 @@ This smart contract allows comments to be linked to web pages. The comments are 
 This smart contract is work in progress.
 
 ### TODO:
-- Store an entry ACTION.
+- Add comment ACTION
+- Add comment on comment ACTION
 - Count payments as likes or dislikes.
 - Send payment amounts of dislikes to token owners.
 - Send payment amounts of likes to creators.
