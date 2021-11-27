@@ -1,6 +1,5 @@
 *.abi
 *.wasm
-*.wasm.*
 *.code-workspace
 *.eosproj
 *.sh

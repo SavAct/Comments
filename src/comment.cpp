@@ -3,18 +3,17 @@
 ACTION comment::section(name creator, string& link){
   require_auth(creator);
 
-  // Get rLink and scope value
+  // Get rLink and corresponding table
   string rLink;
-  uint64_t scopeValue = scopeToValue(getDomainScope(link, rLink));
+  section_table _section(get_self(), scopeToValue(getDomainScope(link, rLink)));
 
-  // Get table by scope
-  section_table _section(get_self(), scopeValue);
-  auto itr = _section.find(scopeValue);
-  
+  // Find the table line
+  auto itr = _section.find(getPrimaryKey(rLink));
+
   // Create a new reference
   Ref ref = {
     // Note: .trxId Will be initiated to zero by itself
-    .bTime = eosio::current_block_time().to_time_point().time_since_epoch().count()
+    .bTime = getTime()
   };
 
   // create entry object
@@ -22,6 +21,7 @@ ACTION comment::section(name creator, string& link){
     .rLink = rLink,
     .like = 0,
     .disl = 0,
+    .count = 0,
     .creator = creator,
     .ref = ref
   };
@@ -33,7 +33,7 @@ ACTION comment::section(name creator, string& link){
       tbLine.entries.push_back(newEntry);
     });
   } else {
-    auto entryItr = findEntry(itr, rLink);  // Find entry
+    auto entryItr = findEntry(*itr, rLink);  // Find entry
     check(entryItr != itr->entries.end(), "This link already exits.");
 
     // Add entry to this tbLine
@@ -44,41 +44,31 @@ ACTION comment::section(name creator, string& link){
 }
 
 ACTION comment::clearentry(string& link) {
-
-  // Get rLink and strScope
+  // Get rLink and corresponding table
   string rLink;
-  string strScope = getDomainScope(link, rLink);
+  section_table _section(get_self(), scopeToValue(getDomainScope(link, rLink)));
 
-  // Get scope value
-  uint64_t scopeValue = scopeToValue(strScope);
+  // Get the entry of the link
+  auto itr = _section.find(getPrimaryKey(rLink));   // Get the table line
+  check(itr != _section.end(), "Comment section doesn't ecxists.");
+  auto entryItr = findEntry(*itr, rLink);            // Get the entry
 
-  // Get table by scope
-  section_table _section(get_self(), scopeValue);
+  // Delete an entry
+  if(entryItr != itr->entries.end()){
+    require_auth(entryItr->creator);      // Check creators authority
+    
+    // Remove this entry
+    _section.modify(itr, get_self(), [&](auto& tbLine) {
+      tbLine.entries.erase(entryItr);
+    });
 
-  // Get the primary key
-  uint64_t primary = getPrimaryKey(rLink);
-
-  // Delete an entry by rLink
-  auto itr = _section.find(primary);
-  if(itr != _section.end()) {
-
-    auto entryItr = findEntry(itr, rLink);  // Find entry
-    if(entryItr != itr->entries.end()){
-      require_auth(entryItr->creator);      // Check creators authority
-      
-      // Remove this entry
-      _section.modify(itr, get_self(), [&](auto& tbLine) {
-        tbLine.entries.erase(entryItr);
-      });
-
-      // Delete the whole table line if there are no entries left
-      if(itr->entries.empty()) {
-        itr = _section.erase(itr);					
-      }
-    } else {
-      // Delete the table line if there are no entries 
-      itr = _section.erase(itr);
+    // Delete the whole table line if there are no entries left
+    if(itr->entries.empty()) {
+      itr = _section.erase(itr);					
     }
+  } else {
+    // Delete the table line if there are no entries 
+    itr = _section.erase(itr);
   }
 }
 
@@ -184,10 +174,10 @@ uint64_t comment::getPrimaryKey(string& rLink){
   return primary;
 }
 
-std::list<comment::Entry>::const_iterator comment::findEntry(comment::section_table::const_iterator itr, name creator){
-	auto entryItr = itr->entries.begin();
-	while (entryItr != itr->entries.end()) {
-    if(entryItr->creator == creator){
+std::list<comment::Entry>::iterator comment::findEntry(comment::sections& item, const string& rLink){
+	std::list<comment::Entry>::iterator entryItr = std::begin(item.entries);
+	while (entryItr != item.entries.end()) {
+    if(std::equal(entryItr->rLink.begin(), entryItr->rLink.end(), std::begin(rLink))){
 			break;
 		}
 		++entryItr;
@@ -195,13 +185,45 @@ std::list<comment::Entry>::const_iterator comment::findEntry(comment::section_ta
 	return entryItr;
 }	
 
-std::list<comment::Entry>::const_iterator comment::findEntry(comment::section_table::const_iterator itr, string& rLink){
-	auto entryItr = itr->entries.begin();
-	while (entryItr != itr->entries.end()) {
+std::list<comment::Entry>::const_iterator comment::findEntry(const comment::sections& item, const string& rLink){
+	auto entryItr = item.entries.begin();
+	while (entryItr != item.entries.end()) {
     if(std::equal(entryItr->rLink.begin(), entryItr->rLink.end(), std::begin(rLink))){
 			break;
 		}
 		++entryItr;
 	}
 	return entryItr;
+}
+
+checksum256 comment::get_trx_id() {
+  size_t size = eosio::transaction_size();
+  char buf[size];
+  size_t read = eosio::read_transaction(buf, size);
+  check(size == read, "read_transaction failed");
+  return eosio::sha256(buf, read);
+}
+
+void comment::updateCommentRef(const string& link, const Ref& ref, const bool directComment){
+  // Get rLink and corresponding table
+  string rLink;
+  section_table _section(get_self(), scopeToValue(getDomainScope(link, rLink)));
+
+  // Get the table line of the link
+  auto itr = _section.find(getPrimaryKey(rLink));   // Get the table line
+  check(itr != _section.end(), "Comment section doesn't exists.");
+
+  // Edit the entry of the link
+  _section.modify(itr, same_payer, [&](auto& tbLine) {
+    auto entryItr = findEntry(tbLine, rLink);
+    check(entryItr != tbLine.entries.end(), "Comment section doesn't exists.");
+    check(ref.bTime == entryItr->ref.bTime, "Block time doesn't match.");
+    check(ref.trxId == entryItr->ref.trxId, "Transaction Id doesn't match.");
+
+    entryItr->ref.bTime = getTime();
+    entryItr->ref.trxId = get_trx_id();
+    if(directComment){
+      entryItr->count++;
+    }
+  });
 }

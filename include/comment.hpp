@@ -1,6 +1,7 @@
 #include <eosio/eosio.hpp>
 #include <eosio/crypto.hpp>
 #include <eosio/system.hpp>
+#include <eosio/transaction.hpp>
 
 using namespace std;
 using namespace eosio;
@@ -9,7 +10,7 @@ CONTRACT comment : public contract {
   public:
     using contract::contract;
 
-    // Reference to the last comment
+    // Reference to a transacion of a comment
     struct Ref{
       int64_t bTime;      // Timestamp of the last comment
       checksum256 trxId;  // Transaction Id of the last comment
@@ -19,8 +20,9 @@ CONTRACT comment : public contract {
       string rLink;       // Rest of the link which is not part of the scope
       uint64_t like;      // Sum of system tokens as likes
       uint64_t disl;      // Sum of system tokens as dislikes
+      uint32_t count;     // Amount of comments, without comment on comments 
       name creator;       // User which creates the entry and who is able to delete it
-      Ref ref;
+      Ref ref;            // Reference to the current last comment 
     };
 
     /**
@@ -39,7 +41,7 @@ CONTRACT comment : public contract {
      * @param msg Comment message
      */ 
     ACTION addcomment(string& link, Ref& ref, string& msg){
-      // TODO
+      updateCommentRef(link, ref);
     }
     
     /**
@@ -51,13 +53,13 @@ CONTRACT comment : public contract {
      * @param msg Comment message
      */ 
     ACTION comcomment(string& link, Ref& ref, Ref& cRef, string& msg){
-      // TODO
+      updateCommentRef(link, ref, false);
     }
 
     /**
      * @brief Remove the entry of a link
      * 
-     * @param link The link
+     * @param link The link to which the comments belong
      */ 
     ACTION clearentry(string& link);
 
@@ -71,21 +73,14 @@ CONTRACT comment : public contract {
     typedef multi_index<name("sections"), sections> section_table;
 
     /**
-     * @brief Find entry by creator name
-     * 
-     * @param itr iterator of the table line
-     * @param creator creator name
-     * @return iterator of the entry
-     */
-    static list<Entry>::const_iterator findEntry(section_table::const_iterator itr, name creator);
-    /**
      * @brief Find entry by rLink
      * 
-     * @param itr iterator of the table line
-     * @param creator creator name
-     * @return iterator of the entry
+     * @param item Item of the table line
+     * @param rLink Contains the rest of a link for search
+     * @return Iterator of the entry
      */
-    static list<Entry>::const_iterator findEntry(section_table::const_iterator itr, string& rLink);
+    static std::list<comment::Entry>::iterator findEntry(comment::sections& item, const string& rLink);
+    static std::list<comment::Entry>::const_iterator findEntry(const comment::sections& item, const string& rLink);
 
     /**
      * @brief Get the primary key by the rLink
@@ -98,7 +93,7 @@ CONTRACT comment : public contract {
     /**
      * @brief Get the domain and the rest of a link. 
      * 
-     * @param link The link
+     * @param link The link to which the comments belong
      * @param rLink Will containing the rest of the link
      * @return Returns the first 12 digits of the domain
      */
@@ -111,4 +106,28 @@ CONTRACT comment : public contract {
      * @return uint64_t 
      */
     static uint64_t scopeToValue(const string& scope);
+
+    /**
+     * @brief Get the trx id
+     * 
+     * @return checksum256 
+     */
+    static checksum256 get_trx_id();
+
+    /**
+     * @brief Get the time of the current block in microseconds
+     * 
+     */
+    static int64_t getTime(){
+      return eosio::current_block_time().to_time_point().time_since_epoch().count();
+    }
+
+    /**
+     * @brief Check the data and update the new current last comment 
+     * 
+     * @param link The link to which the comments belong
+     * @param ref Reference to the last comment 
+     * @param directComment Defines if this comment is a direct comment (no comment to a comment)
+     */
+    void updateCommentRef(const string& link, const Ref& ref, const bool directComment = true);
 };
