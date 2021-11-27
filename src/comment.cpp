@@ -23,7 +23,8 @@ ACTION comment::section(name creator, string& link){
     .disl = 0,
     .count = 0,
     .creator = creator,
-    .ref = ref
+    .ref = ref,
+    .tRef = ref
   };
 
   if(itr == _section.end()){
@@ -222,8 +223,58 @@ void comment::updateCommentRef(const string& link, const Ref& ref, const bool di
 
     entryItr->ref.bTime = getTime();
     entryItr->ref.trxId = get_trx_id();
+    
     if(directComment){
+      entryItr->tRef = entryItr->ref;
       entryItr->count++;
     }
   });
+}
+
+void comment::transfer(name to, asset funds, const std::string& memo){
+	action {
+	  permission_level{get_self(), "active"_n},
+	  "eosio.token"_n,
+	  "transfer"_n,
+	  std::make_tuple(get_self(), to, funds, memo)
+	}.send();
+}
+
+void comment::deposit(name from, name to, asset fund, string memo) {
+  if(to == get_self()){     // Got amount
+
+    // Get rLink and corresponding table
+    string link =  memo.substr(2);
+    string rLink;
+    section_table _section(get_self(), scopeToValue(getDomainScope(link, rLink)));
+
+    // Get the table line of the link
+    auto itr = _section.find(getPrimaryKey(rLink));   // Get the table line
+    check(itr != _section.end(), "Comment section doesn't exists.");
+    check(memo.length() > 2 && memo[1] == ' ', "Wrong format.");
+
+    if(memo[0] == '1'){                         // Like
+      asset forTokenOwners = fund / 10;
+      if(forTokenOwners.amount == 0){
+        forTokenOwners.amount = 1;
+      }
+      asset forCreator = fund - forTokenOwners;
+      transfer(Tokenowners, forCreator, "");
+      transfer(Tokenowners, forTokenOwners, "");
+      
+      // Add the like amount of the link
+      _section.modify(itr, same_payer, [&](auto& tbLine) {
+        auto entryItr = findEntry(tbLine, rLink);
+        entryItr->like += fund.amount;
+      });
+    } else if(memo[0] == '0') {                // Dislike
+      transfer(Tokenowners, fund, "");
+
+      // Add the dislike amount of the link
+      _section.modify(itr, same_payer, [&](auto& tbLine) {
+        auto entryItr = findEntry(tbLine, rLink);
+        entryItr->disl += fund.amount;
+      });
+    }
+  }
 }

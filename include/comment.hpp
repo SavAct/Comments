@@ -2,6 +2,7 @@
 #include <eosio/crypto.hpp>
 #include <eosio/system.hpp>
 #include <eosio/transaction.hpp>
+#include <eosio/asset.hpp>
 
 using namespace std;
 using namespace eosio;
@@ -10,7 +11,7 @@ CONTRACT comment : public contract {
   public:
     using contract::contract;
 
-    // Reference to a transacion of a comment
+    // Reference to a transaction of a comment
     struct Ref{
       int64_t bTime;      // Timestamp of the last comment
       checksum256 trxId;  // Transaction Id of the last comment
@@ -23,7 +24,21 @@ CONTRACT comment : public contract {
       uint32_t count;     // Amount of comments, without comment on comments 
       name creator;       // User which creates the entry and who is able to delete it
       Ref ref;            // Reference to the current last comment 
+      Ref tRef;           // Reference to the current last top comment (This is no comment to a comment)
     };
+
+    constexpr static name Tokenowners = name("stake.savact");
+
+    /**
+     * @brief Notification for system token transfer
+     * 
+     * @param from Sender
+     * @param to Recipient
+     * @param fund Asset
+     * @param memo The memo begins with '0' for dislikes and '1' for likes. Afterwards it follows ' ' and the link
+     */
+    [[eosio::on_notify("eosio.token::transfer")]]
+    void deposit(name from, name to, asset fund, string memo);
 
     /**
      * @brief Create a new comment section
@@ -48,8 +63,8 @@ CONTRACT comment : public contract {
      * @brief Add a new comment to another comment
      * 
      * @param link The link to which the comments belong
-     * @param ref Reference to the last comment
-     * @param cRef Reference to the comment which should be commented
+     * @param ref Reference to the current last comment
+     * @param cRef Reference to the comment which should be a top commented (If not this comment will be ignored by client)
      * @param msg Comment message
      */ 
     ACTION comcomment(string& link, Ref& ref, Ref& cRef, string& msg){
@@ -71,6 +86,15 @@ CONTRACT comment : public contract {
       auto primary_key() const { return hash; }
     };
     typedef multi_index<name("sections"), sections> section_table;
+
+    /**
+     * @brief Send system token to a receiver account
+     * 
+     * @param to Receiver account name
+     * @param funds Asset of system token
+     * @param memo Memo for the transfer
+     */
+    void transfer(name to, asset funds, const std::string& memo);
 
     /**
      * @brief Find entry by rLink
