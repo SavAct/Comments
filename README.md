@@ -18,3 +18,4 @@ As a website owner, you should know your URLs at first. Therefore, you can creat
 - Count payments as likes or dislikes.
 - Send payment amounts of dislikes to token owners.
 - Send payment amounts of likes to creators. It deducts a fee that flows to the token owners. The fee avoids the creator to likes themself for an infinite amount of times.
+- Creator of a comment section is allowed to mark unethical users. This information can be used to warn visitors before a marked comment is displayed.

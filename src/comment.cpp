@@ -51,7 +51,7 @@ ACTION comment::clearentry(string& link) {
 
   // Get the entry of the link
   auto itr = _section.find(getPrimaryKey(rLink));   // Get the table line
-  check(itr != _section.end(), "Comment section doesn't ecxists.");
+  check(itr != _section.end(), "Comment section doesn't exists.");
   auto entryItr = findEntry(*itr, rLink);            // Get the entry
 
   // Delete an entry
@@ -71,6 +71,44 @@ ACTION comment::clearentry(string& link) {
     // Delete the table line if there are no entries 
     itr = _section.erase(itr);
   }
+}
+
+ACTION comment::markbad(string& link, name badentity){
+  // Get rLink and corresponding table
+  string rLink;
+  section_table _section(get_self(), scopeToValue(getDomainScope(link, rLink)));
+
+  // Get the table line of the link
+  auto itr = _section.find(getPrimaryKey(rLink));   // Get the table line
+  check(itr != _section.end(), "Comment section doesn't exists.");
+
+  // Edit the entry of the link
+  _section.modify(itr, same_payer, [&](auto& tbLine) {
+    auto entryItr = findEntry(tbLine, rLink);
+    check(entryItr != tbLine.entries.end(), "Comment section doesn't exists.");
+    require_auth(entryItr->creator);                // Check creators authority
+
+    entryItr->bad.push_back(badentity);             // Add name
+  });
+}
+
+ACTION comment::unmarkbad(string& link, name badentity){
+  // Get rLink and corresponding table
+  string rLink;
+  section_table _section(get_self(), scopeToValue(getDomainScope(link, rLink)));
+
+  // Get the table line of the link
+  auto itr = _section.find(getPrimaryKey(rLink));   // Get the table line
+  check(itr != _section.end(), "Comment section doesn't exists.");
+
+  // Edit the entry of the link
+  _section.modify(itr, same_payer, [&](auto& tbLine) {
+    auto entryItr = findEntry(tbLine, rLink);
+    check(entryItr != tbLine.entries.end(), "Comment section doesn't exists.");
+    require_auth(entryItr->creator);                // Check creators authority
+
+    entryItr->bad.remove(badentity);                // Remove account
+  });
 }
 
 std::string comment::getDomainScope(const string& link, string& rLink){

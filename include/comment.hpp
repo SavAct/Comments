@@ -21,10 +21,11 @@ CONTRACT comment : public contract {
       string rLink;       // Rest of the link which is not part of the scope
       uint64_t like;      // Sum of system tokens as likes
       uint64_t disl;      // Sum of system tokens as dislikes
-      uint32_t count;     // Amount of comments, without comment on comments 
+      uint32_t count;     // Amount of comments, without comment on comments
       name creator;       // User which creates the entry and who is able to delete it
       Ref ref;            // Reference to the current last comment 
       Ref tRef;           // Reference to the current last top comment (This is no comment to a comment)
+      list<name> bad;     // List of unethical account names
     };
 
     constexpr static name Tokenowners = name("stake.savact");
@@ -77,6 +78,25 @@ CONTRACT comment : public contract {
      * @param link The link to which the comments belong
      */ 
     ACTION clearentry(string& link);
+
+    /**
+     * @brief Mark an account as unethical
+     * 
+     * @param creator RAM payer, recipient of payment amounts and authorized account to mark an unethical account
+     * @param link The link to which the comments belong
+     * @param badentity Account name which should be marked as unethical
+     */ 
+    ACTION markbad(string& link, name badentity);
+
+    /**
+     * @brief Unmark an account as unethical
+     * 
+     * @param creator RAM payer, recipient of payment amounts and authorized account to mark an unethical account
+     * @param link The link to which the comments belong
+     * @param badentity Account name which should be marked as unethical
+     */ 
+    ACTION unmarkbad(string& link, name badentity);
+
 
   private:
     // Scope is the first 12 chars of the domain without "www.", "http://", "https://" and "m." is excluded
